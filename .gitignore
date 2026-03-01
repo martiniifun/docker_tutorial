@@ -4,3 +4,5 @@ assets/external/
 *.db
 .web
 __pycache__/
+/ssh-key-2026-03-01.key (2).pub
+/ssh-key-2026-03-01 (2).key
