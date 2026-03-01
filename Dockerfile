@@ -1,27 +1,26 @@
-# 파이썬 3.11 환경
-FROM python:3.11-slim
+# This Dockerfile is used to deploy a simple single-container Reflex app instance.
+FROM python:3.13
 
+RUN apt-get update && apt-get install -y redis-server && rm -rf /var/lib/apt/lists/*
+ENV REFLEX_REDIS_URL=redis://localhost PYTHONUNBUFFERED=1
+
+# Copy local context to `/app` inside container (see .dockerignore)
 WORKDIR /app
-
-# 시스템 의존성 설치 (Reflex 및 내부 도구 작동용)
-RUN apt-get update && apt-get install -y \
-    unzip \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 파이썬 패키지 설치
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 소스 코드 복사
 COPY . .
 
-# Reflex 초기화 및 빌드
+# Install app requirements and reflex in the container
+RUN pip install -r requirements.txt
+
+# Deploy templates and prepare app
 RUN reflex init
-RUN reflex export --frontend-only
 
-# 포트 개방
-EXPOSE 3000 8000
+# Download all npm dependencies and compile frontend
+RUN reflex export --frontend-only --no-zip
 
-# 프로덕션 모드로 실행
-CMD ["reflex", "run", "--env", "prod"]
+# Needed until Reflex properly passes SIGTERM on backend.
+STOPSIGNAL SIGKILL
+
+# Always apply migrations before starting the backend.
+CMD [ -d alembic ] && reflex db migrate; \
+    redis-server --daemonize yes && \
+    exec reflex run --env prod
